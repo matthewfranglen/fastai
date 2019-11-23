@@ -49,9 +49,9 @@ class EfficientNet(nn.Sequential):
     def __init__(self, blocks: List[EfficientNetBlockParameters], model_params: EfficientNetParameters):
         pcn = partial(
             pad_conv_bn,
-            image_size=model_params.image_size,
-            batch_norm_momentum=1 - model_params.batch_norm_momentum,
-            batch_norm_epsilon=model_params.batch_norm_epsilon,
+            img_size=model_params.img_size,
+            bn_momentum=1 - model_params.bn_momentum,
+            bn_epsilon=model_params.bn_epsilon,
         )
 
         in_channels = 3
@@ -98,9 +98,9 @@ def mbconv(block_parameters: EfficientNetBlockParameters, model_params: Efficien
 
     pcn = partial(
         pad_conv_bn,
-        image_size=model_params.image_size,
-        batch_norm_momentum=1 - model_params.batch_norm_momentum,
-        batch_norm_epsilon=model_params.batch_norm_epsilon,
+        img_size=model_params.img_size,
+        bn_momentum=1 - model_params.bn_momentum,
+        bn_epsilon=model_params.bn_epsilon,
     )
 
     if block_parameters.expand_ratio != 1:
@@ -178,11 +178,11 @@ class SkipDropConnection(nn.Sequential):
         return F.dropout(_in, p=self.dropout, training=self.training) + out
 
 
-def pad(conv: nn.Conv2d, image_size: Value2d) -> Optional[nn.Module]:
+def pad(conv: nn.Conv2d, img_size: Value2d) -> Optional[nn.Module]:
     stride_height, stride_width = listify(conv.stride, 2)
     dilation_height, dilation_width = listify(conv.dilation, 2)
     kernel_height, kernel_width = conv.weight.shape[-2:]
-    image_height, image_width = listify(image_size, 2)
+    image_height, image_width = listify(img_size, 2)
 
     output_height = math.ceil(image_height / stride_height)
     output_width = math.ceil(image_width / stride_width)
@@ -234,9 +234,9 @@ class MemoryEfficientSwish(nn.Module):
 
 def pad_conv_bn(
     *,
-    image_size: Value2d,
-    batch_norm_momentum: float,
-    batch_norm_epsilon: float,
+    img_size: Value2d,
+    bn_momentum: float,
+    bn_epsilon: float,
     in_channels: int,
     out_channels: int,
     kernel_size: Value2d,
@@ -262,15 +262,15 @@ def pad_conv_bn(
         bias,
         padding_mode,
     )
-    padding = pad(conv, image_size)
+    padding = pad(conv, img_size)
     if padding:
         layers.append(padding)
     layers.append(conv)
     layers.append(
         nn.BatchNorm2d(
             num_features=out_channels,
-            momentum=batch_norm_momentum,
-            eps=batch_norm_epsilon,
+            momentum=bn_momentum,
+            eps=bn_epsilon,
         )
     )
     if has_swish:
@@ -282,7 +282,7 @@ class EfficientNetHead(nn.Module):
     def __init__(self, in_channels: int, model_params: EfficientNetParameters):
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.dropout = nn.Dropout(model_params.dropout_rate)
+        self.dropout = nn.Dropout(model_params.dropout)
         self.fc = nn.Linear(
             in_channels, model_params.num_classes
         )
@@ -321,11 +321,11 @@ class EfficientNetParameters:
 
     width_coefficient: float
     depth_coefficient: float
-    image_size: int
-    dropout_rate: float
+    img_size: int
+    dropout: float
 
-    batch_norm_momentum: float = 0.99
-    batch_norm_epsilon: float = 1e-3
+    bn_momentum: float = 0.99
+    bn_epsilon: float = 1e-3
     drop_connect_rate: float = 0.2
     num_classes: int = 1_000
     depth_divisor: int = 8
@@ -359,57 +359,57 @@ _MODEL_PARAMS = {
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b0-355c32eb.pth",
         width_coefficient=1.0,
         depth_coefficient=1.0,
-        image_size=224,
-        dropout_rate=0.2,
+        img_size=224,
+        dropout=0.2,
     ),
     "efficientnet-b1": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b1-f1951068.pth",
         width_coefficient=1.0,
         depth_coefficient=1.1,
-        image_size=240,
-        dropout_rate=0.2,
+        img_size=240,
+        dropout=0.2,
     ),
     "efficientnet-b2": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b2-8bb594d6.pth",
         width_coefficient=1.1,
         depth_coefficient=1.2,
-        image_size=260,
-        dropout_rate=0.3,
+        img_size=260,
+        dropout=0.3,
     ),
     "efficientnet-b3": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b3-5fb5a3c3.pth",
         width_coefficient=1.2,
         depth_coefficient=1.4,
-        image_size=300,
-        dropout_rate=0.3,
+        img_size=300,
+        dropout=0.3,
     ),
     "efficientnet-b4": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b4-6ed6700e.pth",
         width_coefficient=1.4,
         depth_coefficient=1.8,
-        image_size=380,
-        dropout_rate=0.4,
+        img_size=380,
+        dropout=0.4,
     ),
     "efficientnet-b5": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b5-b6417697.pth",
         width_coefficient=1.6,
         depth_coefficient=2.2,
-        image_size=456,
-        dropout_rate=0.4,
+        img_size=456,
+        dropout=0.4,
     ),
     "efficientnet-b6": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b6-c76e70fd.pth",
         width_coefficient=1.8,
         depth_coefficient=2.6,
-        image_size=528,
-        dropout_rate=0.5,
+        img_size=528,
+        dropout=0.5,
     ),
     "efficientnet-b7": EfficientNetParameters(
         url="http://storage.googleapis.com/public-models/efficientnet/efficientnet-b7-dcc49843.pth",
         width_coefficient=2.0,
         depth_coefficient=3.1,
-        image_size=600,
-        dropout_rate=0.5,
+        img_size=600,
+        dropout=0.5,
     ),
 }
 
@@ -485,15 +485,3 @@ _BLOCK_PARAMS = [
         se_ratio=0.25,
     ),
 ]
-
-
-def load_pretrained_weights(model: nn.Module, model_name: str) -> None:
-    """ Loads pretrained weights, and downloads if loading for the first time. """
-    mapping = json.loads(_STATE_MAP.read_text())[model_name]
-    state = {
-        mapping[key]: value
-        for key, value in model_zoo.load_url(
-            _MODEL_PARAMS[model_name].url
-        ).items()
-    }
-    model.load_state_dict(state)
